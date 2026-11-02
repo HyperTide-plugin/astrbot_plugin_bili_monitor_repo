@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>B站监控助手</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="head">
+        <div class="head-left">
+          <h1>B站监控助手</h1>
+          <p class="muted" id="subtitle">正在加载…</p>
+        </div>
+        <div class="head-right">
+          <span class="pill" id="run-pill">未知</span>
+          <button class="btn ghost" id="btn-refresh" type="button">刷新</button>
+        </div>
+      </header>
+
+      <section class="stats" id="stats"></section>
+
+      <div class="banner" id="migrate-banner" hidden>
+        <span data-banner-text></span>
+        <button class="btn" data-act="apply-defaults" type="button">把默认推送复制给它们</button>
+      </div>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>① 订阅的 UP 主</h2>
+          <span class="muted" id="uid-count"></span>
+        </div>
+        <div class="add-row">
+          <input id="uid-input" type="text" inputmode="numeric" placeholder="输入 UID，例如 208259" />
+          <button class="btn primary" id="btn-add-uid" type="button">添加</button>
+        </div>
+        <div class="list" id="uid-list"></div>
+        <p class="hint">UID 在 B 站个人空间地址里：<code>space.bilibili.com/<b>208259</b></code>。每行的「推送」可以单独指定这个 UP 主发到哪些群，互相隔离。</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>② 默认推送（可选）</h2>
+          <span class="muted" id="target-count"></span>
+        </div>
+        <div class="add-row">
+          <input id="target-input" type="text" placeholder="aiocqhttp:GroupMessage:123456789" />
+          <button class="btn primary" id="btn-add-target" type="button">添加</button>
+        </div>
+        <div class="list" id="target-list"></div>
+        <p class="hint">只在关闭「严格隔离」时生效：没单独配群的 UP 主才推这里。不知道填什么？在群里发 <code>/bili id</code>。</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>③ 运行参数</h2>
+        </div>
+        <div class="settings">
+          <label class="switch">
+            <input type="checkbox" id="cfg-enable" />
+            <span>启用后台监控</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="cfg-live" />
+            <span>监控开播 / 下播</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="cfg-image" />
+            <span>图片模式（第三方截图站）</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="cfg-strict" />
+            <span>严格隔离（每个 UP 只推自己的群）</span>
+          </label>
+          <label class="field">
+            <span>轮询间隔（秒）</span>
+            <input type="number" id="cfg-interval" min="30" step="10" />
+          </label>
+          <label class="field">
+            <span>勿扰时段（留空不启用）</span>
+            <input type="text" id="cfg-quiet" placeholder="23:30-07:30" />
+          </label>
+          <label class="field wide">
+            <span>B 站 Cookie（可选，风控时再填）</span>
+            <input type="password" id="cfg-cookie" placeholder="留空表示不修改" autocomplete="off" />
+          </label>
+          <label class="field wide">
+            <span>代理（可选，机房 IP 被 412 时用）</span>
+            <input type="password" id="cfg-proxy" placeholder="http://127.0.0.1:7890 或 http://user:pass@host:port" autocomplete="off" />
+          </label>
+          <div class="field wide">
+            <span>B 站账号</span>
+            <div class="login-row">
+              <button class="btn" id="btn-login" type="button">扫码登录 B 站</button>
+              <button class="btn ghost" id="btn-login-cancel" type="button" hidden>取消</button>
+            </div>
+            <p class="hint" id="account-line"></p>
+          </div>
+        </div>
+        <div class="login-panel" id="login-panel" hidden>
+          <img id="login-qr" alt="B站登录二维码" />
+          <div class="login-info">
+            <div id="login-status">请用要给机器人使用的账号扫码</div>
+            <p class="hint">
+              扫的是<b>哪个 B 站账号</b>，机器人以后就用<b>哪个账号的身份</b>访问 B 站。<br />
+              扫码仅用于获取 Cookie，供插件带登录态读取公开接口（降低风控）；<b>不会发布、点赞、关注或修改任何内容</b>。<br />
+              建议用小号，别用主号；随时可在 B 站「登录设备管理」里移除该设备。
+            </p>
+          </div>
+        </div>
+        <p class="hint" id="cookie-hint"></p>
+      </section>
+
+      <footer class="actions">
+        <button class="btn primary" id="btn-save" type="button">保存配置</button>
+        <button class="btn" id="btn-check" type="button">立即检查</button>
+        <button class="btn" id="btn-test" type="button">测试推送</button>
+        <span class="muted" id="dirty-hint"></span>
+      </footer>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

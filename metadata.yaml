@@ -1,0 +1,11 @@
+name: astrbot_plugin_bili_monitor
+display_name: B站监控助手
+short_desc: 监控 B 站 UP 主的动态与直播，主动推送到 QQ 群/私聊。
+desc: 监控 B 站 UP 主的动态、视频、专栏、音频与直播开播/下播，按会话主动推送；移植自萌Q插件「bili监控助手」
+help: /bili list 查看订阅；/bili info <UID> 查询 UP 主；/bili id 查看当前会话 ID
+version: v1.2.1
+author: 你的 GitHub ID
+repo: ""
+astrbot_version: ">=4.0.0"
+support_platforms:
+  - aiocqhttp

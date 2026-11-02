@@ -1,0 +1,198 @@
+{
+  "enable": {
+    "description": "启用后台监控",
+    "type": "bool",
+    "default": true,
+    "hint": "关掉后插件只保留只读指令，不再轮询 B 站接口。"
+  },
+  "check_interval": {
+    "description": "轮询间隔（秒）",
+    "type": "int",
+    "default": 90,
+    "slider": { "min": 30, "max": 1800, "step": 10 },
+    "hint": "每个 UP 主每轮各请求一次动态接口。订阅多的时候插件会自动把周期拉长，别调太小，容易触发风控。"
+  },
+  "uids": {
+    "description": "① 订阅的 UP 主 UID",
+    "type": "list",
+    "default": [],
+    "hint": "一行一个 UID，纯数字即可，比如 208259（B站官方）、946974（影视飓风）。\n点列表右侧的 + 添加，不用写分隔符。"
+  },
+  "room_overrides": {
+    "description": "② 直播间号（可留空）",
+    "type": "list",
+    "default": [],
+    "hint": "格式 UID:房间号，例如 946974:173551。\n留空的话插件会自己调 B 站接口查直播间号；填了就以手填的为准（UP 主换房间号或接口查不到时用）。\n只订阅动态、不关心直播的，这里完全不用填。"
+  },
+  "push_targets": {
+    "description": "③ 默认推送（可选）",
+    "type": "list",
+    "default": [],
+    "_special": "umo",
+    "hint": "只在「关闭严格隔离」时生效：没有单独配推送群的 UP 主，会推到这里。\n严格隔离开启时（默认），这个列表不会被使用，请在下面「routes」或仪表盘里给每个 UP 主单独配群。"
+  },
+  "routes": {
+    "description": "④ 每个 UP 主的推送群",
+    "type": "list",
+    "default": [],
+    "hint": "一行一条，格式 UID|会话ID，例如：\n946974|aiocqhttp:GroupMessage:123456789\n946974|aiocqhttp:GroupMessage:987654321（同一个 UP 多个群就写多行）\n208259|aiocqhttp:GroupMessage:555555555\n每个 UP 只推自己名下的群，互不影响。\n推荐直接在插件仪表盘里点选，比手写省事。"
+  },
+  "strict_isolation": {
+    "description": "严格隔离（每个 UP 只推自己的群）",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后：没配专属群的 UP 主不会推送，绝不会落到别人的群里。\n关闭后：没配专属群的 UP 主会回落到「③ 默认推送」。"
+  },
+  "cookie": {
+    "description": "B 站 Cookie（可选）",
+    "type": "text",
+    "default": "",
+    "secret": true,
+    "hint": "留空则匿名访问（插件会自动获取 buvid3 并做 WBI 签名）。出现 -352 风控时，把浏览器里 bilibili.com 的 Cookie 整段贴进来，至少要有 SESSDATA。"
+  },
+  "proxy": {
+    "description": "代理（可选，机房 IP 被 412 时用）",
+    "type": "string",
+    "default": "",
+    "secret": true,
+    "hint": "形如 http://127.0.0.1:7890 或 http://user:pass@host:port。\n云服务器直连 B 站常被 WAF 拦成 412 request was banned，走住宅代理最有效。\n留空表示直连。"
+  },
+  "admin_only_login": {
+    "description": "扫码登录仅管理员可用",
+    "type": "bool",
+    "default": true,
+    "hint": "扫码会把机器人绑定到「扫码人」的 B 站账号上。\n开着的话只有 AstrBot 管理员能触发 /bili login，避免群友把自己的号绑给机器人。"
+  },
+  "risk_cooldown": {
+    "description": "被风控后冷却多少秒",
+    "type": "int",
+    "default": 300,
+    "slider": { "min": 60, "max": 3600, "step": 60 },
+    "hint": "返回 412 / 429 后暂停请求的时间。风控期间继续请求只会越封越久。"
+  },
+  "live_monitor": {
+    "description": "监控直播开播 / 下播",
+    "type": "bool",
+    "default": true
+  },
+  "notify_dynamic": {
+    "description": "推送：新动态（图文）",
+    "type": "bool",
+    "default": true
+  },
+  "notify_video": {
+    "description": "推送：新视频",
+    "type": "bool",
+    "default": true
+  },
+  "notify_article": {
+    "description": "推送：新专栏",
+    "type": "bool",
+    "default": true
+  },
+  "notify_audio": {
+    "description": "推送：新音频",
+    "type": "bool",
+    "default": true
+  },
+  "notify_forward": {
+    "description": "推送：转发动态",
+    "type": "bool",
+    "default": true
+  },
+  "notify_live": {
+    "description": "推送：开播 / 下播提醒",
+    "type": "bool",
+    "default": true
+  },
+  "image_mode": {
+    "description": "图片模式（动态渲染成图片）",
+    "type": "bool",
+    "default": true,
+    "hint": "沿用原插件的做法：把动态链接交给第三方截图站渲染成长图再发。截图站挂了会自动退回纯文本。关掉则只发文字和原图。"
+  },
+  "image_service": {
+    "description": "截图服务地址",
+    "type": "string",
+    "default": "http://opus.bilibilibot.com/ScreenShot_biliOpus.php?url=",
+    "hint": "末尾直接拼动态链接（会做 URL 编码）。原插件用的就是这一家；也可以换成自建服务，留空则完全关闭截图。"
+  },
+  "attach_images": {
+    "description": "非图片模式下附带动态原图",
+    "type": "bool",
+    "default": true,
+    "hint": "关掉就只发文字和链接，省流量。"
+  },
+  "at_all_live": {
+    "description": "开播提醒 @全体成员",
+    "type": "bool",
+    "default": false,
+    "hint": "需要机器人在群里是管理员，否则 @全体 会失效。"
+  },
+  "at_all_dynamic": {
+    "description": "动态提醒 @全体成员",
+    "type": "bool",
+    "default": false
+  },
+  "quiet_hours": {
+    "description": "夜间勿扰时段",
+    "type": "string",
+    "default": "",
+    "hint": "格式 23:30-07:30，留空表示不启用。勿扰期间仍然会更新状态，只是不发消息，避免早上一次性刷屏。"
+  },
+  "max_new_per_round": {
+    "description": "单轮每个 UP 主最多推几条",
+    "type": "int",
+    "default": 5,
+    "slider": { "min": 1, "max": 20, "step": 1 },
+    "hint": "停机一段时间后重新上线，堆积的旧动态最多推这么多条，防止刷屏。"
+  },
+  "first_run_hours": {
+    "description": "首次运行只推最近多少小时内更新",
+    "type": "int",
+    "default": 24,
+    "slider": { "min": 0, "max": 168, "step": 1 },
+    "hint": "第一次启用某个 UID 时，比这个时间更早的动态只记录不推送。填 0 表示首次运行什么都不推。"
+  },
+  "enable_commands": {
+    "description": "启用只读指令",
+    "type": "bool",
+    "default": true,
+    "hint": "/bili list、/bili info <UID>、/bili id"
+  },
+  "tpl_dynamic": {
+    "description": "模板：新动态",
+    "type": "text",
+    "default": "【动态提醒】{nick} 发布了新动态\n{text}\n{link}"
+  },
+  "tpl_video": {
+    "description": "模板：新视频",
+    "type": "text",
+    "default": "【视频提醒】{nick} 发布了新视频\n{title}\n{link}"
+  },
+  "tpl_article": {
+    "description": "模板：新专栏",
+    "type": "text",
+    "default": "【专栏提醒】{nick} 发布了新专栏\n{title}\n{link}"
+  },
+  "tpl_audio": {
+    "description": "模板：新音频",
+    "type": "text",
+    "default": "【音频提醒】{nick} 发布了新音频\n{title}\n{link}"
+  },
+  "tpl_forward": {
+    "description": "模板：转发动态",
+    "type": "text",
+    "default": "【转发提醒】{nick}\n{text}\n{link}"
+  },
+  "tpl_live_on": {
+    "description": "模板：开播",
+    "type": "text",
+    "default": "【开播提醒】{nick} 开播啦~\n{title}\n{link}"
+  },
+  "tpl_live_off": {
+    "description": "模板：下播",
+    "type": "text",
+    "default": "【下播提醒】{nick} 下播啦！\n直播时长：{duration}\n人气峰值：{peak}"
+  }
+}
