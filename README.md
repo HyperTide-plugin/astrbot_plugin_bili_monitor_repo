@@ -3,6 +3,7 @@
 监控 B 站 UP 主的**动态 / 视频 / 专栏 / 音频 / 转发**，以及**直播开播与下播**，命中后主动推送到指定的 QQ 群或私聊。
 
 移植自萌Q（MQNT）框架的插件 `bili监控助手.dll`，按 AstrBot v4 的插件规范重写：配置进 WebUI、订阅拆成三个列表、额外带一个可视化仪表盘。
+如果原作者看到这个仓库请联系我。QQ:1175476566
 
 ![logo](logo.png)
 
@@ -26,7 +27,7 @@
 | 自定义模板 | 7 个模板，占位符见下 |
 | 仪表盘 | 增删订阅、改房间号、按 UP 配群、测试推送、立即检查 |
 
-**没做的**：粉丝数千粉提醒、爱发电动态。原插件的授权校验、版本检查、自动更新、推送数据上报也全部剔除。
+
 
 ---
 
@@ -42,7 +43,7 @@
 
 ```bash
 cd AstrBot/data/plugins
-git clone https://github.com/<你的名字>/astrbot_plugin_bili_monitor.git
+git clone https://github.com/HyperTide-Plugin/astrbot_plugin_bili_monitor.git
 ```
 
 **方式三：手动复制**
@@ -57,12 +58,7 @@ git clone https://github.com/<你的名字>/astrbot_plugin_bili_monitor.git
 
 四个列表 + 一个开关：
 
-| 配置项 | 填什么 | 例子 |
-|---|---|---|
-| ① 订阅的 UP 主 UID | 纯数字 UID | `208259`、`946974` |
-| ② 直播间号（可留空） | `UID:房间号` | `946974:173551` |
-| ③ 默认推送（可选） | 会话 ID | `aiocqhttp:GroupMessage:123456789` |
-| ④ 每个 UP 主的推送群 | `UID|会话ID` | `946974|aiocqhttp:GroupMessage:123` |
+
 
 **推送隔离**（重点）：
 
@@ -79,7 +75,7 @@ git clone https://github.com/<你的名字>/astrbot_plugin_bili_monitor.git
 
 ## 扫码登录（自动拿 Cookie）
 
-不用去浏览器复制 Cookie 了，两种方式：
+不用去浏览器复制 Cookie ，两种方式：
 
 - **仪表盘**：③ 运行参数 → 「扫码登录 B 站」→ 屏幕出二维码 → 手机 B 站扫 → 点确认。成功后 Cookie 自动保存并立刻生效。
 - **聊天指令**：在群里发 `/bili login`，机器人把二维码发到聊天里，扫完会自动回复「登录成功」。
@@ -105,7 +101,7 @@ git clone https://github.com/<你的名字>/astrbot_plugin_bili_monitor.git
 保存的是 `SESSDATA`、`bili_jct`、`DedeUserID` 这几个关键 Cookie（写入插件配置的 `cookie` 项，只写不读，仪表盘里看不到原文）。
 
 > 二维码是本地生成的（`qrcode` 库出矩阵 + 自己写 PNG），不会把你的登录二维码发给任何第三方。
-> 如果服务器上装不上 `qrcode`，插件不会崩，会自动降级成"把登录链接发给你手动打开"。
+> 如果服务器上装不上 `qrcode`，插件不会崩，会自动降级"把登录链接发给你手动打开"。
 
 ---
 
