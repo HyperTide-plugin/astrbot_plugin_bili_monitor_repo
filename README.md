@@ -8,6 +8,8 @@
 
 如果原作者看到这个仓库请联系我。QQ:1175476566
 
+
+
 ![logo](logo.png)
 
 ---
@@ -25,18 +27,16 @@
 | 下播提醒 | 带直播时长与人气峰值 |
 | **推送隔离** | 每个 UP 主只推自己配的群，多群也行，互不串台 |
 | **扫码登录** | 仪表盘按钮或 `/bili login`，扫一下自动保存 Cookie，不用手填 |
-| 图片模式 | 把动态渲染成长图（第三方截图站，可关，失败自动退纯文本） |
+| 图片模式 | 把动态渲染成卡片图（本地生成，不依赖第三方，失败自动退纯文本） |
 | 夜间勿扰 | 勿扰期间只更新状态不发消息，避免早上刷屏 |
 | 自定义模板 | 7 个模板，占位符见下 |
 | 仪表盘 | 增删订阅、改房间号、按 UP 配群、测试推送、立即检查 |
-
-
 
 ---
 
 ## 安装
 
-要求 **AstrBot >= 4.0**（仪表盘需要支持 `views/` 插件页面的版本）。依赖只有 `aiohttp`（AstrBot 自带）和 `qrcode`（生成登录二维码，纯 Python，插件目录里的 `requirements.txt` 会在安装时自动装）。
+要求 **AstrBot >= 4.0**（仪表盘需要支持 `views/` 插件页面的版本）。依赖只有 `aiohttp`（AstrBot 自带）、`qrcode`（生成登录二维码）和 `pillow`（渲染推送卡片），后两个在插件目录的 `requirements.txt` 里，安装时自动装。
 
 **方式一：WebUI 上传**
 
@@ -61,7 +61,12 @@ git clone https://github.com/HyperTide-Plugin/astrbot_plugin_bili_monitor.git
 
 四个列表 + 一个开关：
 
-
+| 配置项 | 填什么 | 例子 |
+|---|---|---|
+| ① 订阅的 UP 主 UID | 纯数字 UID | `208259`、`946974` |
+| ② 直播间号（可留空） | `UID:房间号` | `946974:173551` |
+| ③ 默认推送（可选） | 会话 ID | `aiocqhttp:GroupMessage:123456789` |
+| ④ 每个 UP 主的推送群 | `UID|会话ID` | `946974|aiocqhttp:GroupMessage:123` |
 
 **推送隔离**（重点）：
 
@@ -78,7 +83,7 @@ git clone https://github.com/HyperTide-Plugin/astrbot_plugin_bili_monitor.git
 
 ## 扫码登录（自动拿 Cookie）
 
-不用去浏览器复制 Cookie ，两种方式：
+不用去浏览器复制 Cookie 了，两种方式：
 
 - **仪表盘**：③ 运行参数 → 「扫码登录 B 站」→ 屏幕出二维码 → 手机 B 站扫 → 点确认。成功后 Cookie 自动保存并立刻生效。
 - **聊天指令**：在群里发 `/bili login`，机器人把二维码发到聊天里，扫完会自动回复「登录成功」。
@@ -104,7 +109,7 @@ git clone https://github.com/HyperTide-Plugin/astrbot_plugin_bili_monitor.git
 保存的是 `SESSDATA`、`bili_jct`、`DedeUserID` 这几个关键 Cookie（写入插件配置的 `cookie` 项，只写不读，仪表盘里看不到原文）。
 
 > 二维码是本地生成的（`qrcode` 库出矩阵 + 自己写 PNG），不会把你的登录二维码发给任何第三方。
-> 如果服务器上装不上 `qrcode`，插件不会崩，会自动降级"把登录链接发给你手动打开"。
+> 如果服务器上装不上 `qrcode`，插件不会崩，会自动降级成"把登录链接发给你手动打开"。
 
 ---
 
@@ -154,6 +159,23 @@ git clone https://github.com/HyperTide-Plugin/astrbot_plugin_bili_monitor.git
 
 ---
 
+## 图片模式（本地渲染）
+
+开启后，推送不再发文字，而是发一张**卡片图**：头像、昵称、时间、正文、配图、链接都在图里。
+
+![示例卡片](docs/sample-card.png)
+
+- **完全本地生成**（Pillow），不调用任何外部截图服务——机房服务器也能用
+- 需要 `pillow`（已在 `requirements.txt`，安装插件时自动装）和系统里的中文字体
+- 缺 Pillow 或找不到中文字体时，**自动退回文字推送**，不会丢消息，日志里会写原因
+- 仪表盘 ③ 运行参数里有「**测试图片模式**」按钮，点一下直接看到自检卡片，不用等真实推送
+- 配图会下载最多 3 张拼进卡片；图里没有彩色 emoji 字体，emoji 会被去掉
+- `image_service` 留空即可；旧版默认的 `opus.bilibilibot.com` 已经连不上了，填了也会被忽略
+
+> 如果你的服务器完全没有中文字体，装一个即可：`apt install fonts-noto-cjk`（Debian/Ubuntu）。
+
+---
+
 ## 风控与 Cookie
 
 B 站对匿名请求查得紧，插件做了这几层处理：
@@ -189,9 +211,10 @@ astrbot_plugin_bili_monitor/
 ├── bili_api.py        B 站接口 + WBI 签名 + buvid + 空结果重试 + 扫码登录
 ├── parser.py          动态卡片解析（各种 major 结构归一化）
 ├── qr.py              二维码 PNG（qrcode 出矩阵，zlib 自己拼 PNG）
+├── render.py          推送卡片渲染（Pillow 画头像/正文/配图）
 ├── metadata.yaml      插件元信息
 ├── _conf_schema.json  配置面板定义
-├── requirements.txt   只有 qrcode
+├── requirements.txt   qrcode + pillow
 ├── logo.png           插件图标
 ├── views/dashboard/   仪表盘（index.html / app.js / style.css）
 └── tests/             本地测试与 astrbot 桩
@@ -225,7 +248,7 @@ python tests/test_online.py 946974    # 打真实 B 站接口，需要网络
 | 一直没动静 | `enable` 关了、UID 列表为空、或间隔太大 |
 | 消息发到了别人的群 | 检查 ④ 里这个 UID 有没有误配；严格隔离下不会串 |
 | 房间号一直空 | 该 UP 主没开通过直播间；或手动填一个 |
-| 图片发不出来 | 截图站不可用，已自动退纯文本 |
+| 图片发不出来 | 点仪表盘「测试图片模式」看原因；多半是没装 `pillow` 或系统缺中文字体，此时会自动退文字 |
 | 日志反复 412 | 机房 IP 被 WAF 拦：先用扫码登录拿 Cookie，仍不行就配 `proxy` |
 | 扫码后一直「等待扫码」 | 确认扫的是插件显示的那张码；3 分钟会过期，重新点一次 |
 | 扫码成功但 Cookie 没生效 | 看日志有没有「扫码登录成功」；没有就重载插件再试 |
