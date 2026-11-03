@@ -106,16 +106,16 @@
     "default": true
   },
   "image_mode": {
-    "description": "图片模式（动态渲染成图片）",
+    "description": "图片模式（本地渲染成图片卡片）",
     "type": "bool",
     "default": true,
-    "hint": "沿用原插件的做法：把动态链接交给第三方截图站渲染成长图再发。截图站挂了会自动退回纯文本。关掉则只发文字和原图。"
+    "hint": "把动态/视频渲染成一张图再发：头像、昵称、时间、正文、配图、链接都在图里。\n图片是插件本地画的（需要 Pillow + 系统中文字体），不依赖任何外部截图服务。\n渲染失败会自动退回文字推送。"
   },
   "image_service": {
-    "description": "截图服务地址",
+    "description": "外部截图服务（一般不用填）",
     "type": "string",
-    "default": "http://opus.bilibilibot.com/ScreenShot_biliOpus.php?url=",
-    "hint": "末尾直接拼动态链接（会做 URL 编码）。原插件用的就是这一家；也可以换成自建服务，留空则完全关闭截图。"
+    "default": "",
+    "hint": "留空就用本地渲染。只有你有自建截图服务时才填，形如 http://host/shot.php?url= ，末尾会拼动态链接。\n旧版默认的 opus.bilibilibot.com 已经连不上了，填了也会被忽略。"
   },
   "attach_images": {
     "description": "非图片模式下附带动态原图",

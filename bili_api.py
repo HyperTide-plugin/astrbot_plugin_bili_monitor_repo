@@ -301,6 +301,15 @@ class BiliClient:
 
     # ------------------------------------------------------------------ 业务接口
 
+    async def fetch_bytes(self, url: str, referer: str = "") -> bytes:
+        """下载图片之类的二进制内容（渲染卡片时取配图/头像用）。"""
+        sess = await self._session_or_new()
+        headers = {"Referer": referer} if referer else {}
+        async with sess.get(url, headers=headers, **self._proxy_args()) as resp:
+            if resp.status != 200:
+                raise BiliError(f"下载失败 HTTP {resp.status}: {url[:80]}")
+            return await resp.read()
+
     async def user_info(self, uid: str) -> dict:
         """UP 主基本信息：name / face / sign / level。"""
         params = {

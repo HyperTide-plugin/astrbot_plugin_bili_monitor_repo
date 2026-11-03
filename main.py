@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import inspect
 import json
 import os
@@ -50,6 +51,7 @@ except Exception:  # 老版本没有这套 API，仪表盘会自动降级
 from .bili_api import BiliClient, BiliError, BiliRiskError
 from .parser import KIND_LABEL, parse_dynamic
 from . import qr as qr_mod
+from . import render as card_mod
 
 try:  # 持久化目录，拿不到就退化到工作目录
     from astrbot.core.utils.astrbot_path import get_astrbot_data_path
@@ -81,6 +83,9 @@ TPL_KEY = {
     "live_on": "tpl_live_on",
     "live_off": "tpl_live_off",
 }
+
+# 原插件默认用的第三方截图站，机房网络基本连不上，遇到就当没配置
+LEGACY_IMAGE_SERVICE = "http://opus.bilibilibot.com/ScreenShot_biliOpus.php?url="
 
 
 class _BlankDict(dict):
@@ -592,12 +597,23 @@ class BiliMonitor(Star):
         if not message:
             message = f"{item['nick']} 更新了{KIND_LABEL.get(item['kind'], '动态')}\n{item['link']}"
 
-        images: list[str] = []
-        if self._bool_cfg("image_mode", True) and item["kind"] in ("dynamic", "article", "forward"):
+        at_all = self._bool_cfg("at_all_dynamic", False)
+
+        # 图片模式：先用本地渲染（不依赖外部服务），其次外部截图站，都不行才发文字
+        if self._bool_cfg("image_mode", True):
+            card = await self._render_card(item, title=title, text=text)
+            if card and await self._push(sub, "", png=card, at_all=at_all):
+                return
             shot = self._screenshot_url(item["link"])
-            if shot:
-                images = [shot]
-        elif item["kind"] in ("video", "audio"):
+            if shot and await self._push(sub, "", images=[shot], at_all=at_all):
+                return
+            logger.warning(
+                f"[bili_monitor] 图片模式不可用（UID {sub['uid']}），本条退回文本："
+                f"card={'ok' if card else 'none'}, service={'yes' if shot else 'no'}"
+            )
+
+        images: list[str] = []
+        if item["kind"] in ("video", "audio"):
             images = [item["cover"]] if item["cover"] else item["images"][:1]
         elif self._bool_cfg("attach_images", True):
             images = item["images"][:4]
@@ -606,7 +622,7 @@ class BiliMonitor(Star):
             sub,
             message,
             images=images,
-            at_all=self._bool_cfg("at_all_dynamic", False),
+            at_all=at_all,
         )
 
     # ------------------------------------------------------------------ 直播
@@ -702,11 +718,58 @@ class BiliMonitor(Star):
 
     def _screenshot_url(self, link: str) -> str:
         service = str(self._cfg("image_service", "") or "").strip()
-        if not service:
+        if not service or service.lower() in ("off", "none", "0", "-"):
+            return ""
+        if service == LEGACY_IMAGE_SERVICE:
+            # 原插件用的第三方截图站，机房环境基本连不上，当作没配
             return ""
         if "?" not in service:
             service += "?url="
         return service + quote(link, safe="")
+
+    async def _fetch_image(self, url: str) -> bytes | None:
+        if not url:
+            return None
+        if url.startswith("//"):
+            url = "https:" + url
+        try:
+            return await self._client.fetch_bytes(url, referer="https://t.bilibili.com/")
+        except Exception as e:
+            logger.debug(f"[bili_monitor] 下载配图失败：{e!r}")
+            return None
+
+    async def _render_card(self, item: dict, title: str = "", text: str = "") -> bytes | None:
+        """本地画一张卡片；不可用（没 Pillow / 没字体）时返回 None。"""
+        if not card_mod.available():
+            return None
+
+        urls: list[str] = []
+        if item["kind"] in ("video", "audio") and item.get("cover"):
+            urls = [item["cover"]]
+        else:
+            urls = list(item.get("images") or [])[:3]
+
+        pics: list[bytes] = []
+        for url in urls:
+            data = await self._fetch_image(url)
+            if data:
+                pics.append(data)
+        avatar = await self._fetch_image(item.get("face") or "")
+
+        try:
+            return card_mod.render_card(
+                nick=item.get("nick") or "",
+                text=text,
+                title=title,
+                time_text=fmt_ts(item["ts"]),
+                link=item["link"],
+                kind=KIND_LABEL.get(item["kind"], "动态"),
+                avatar=avatar,
+                images=pics,
+            )
+        except Exception as e:
+            logger.warning(f"[bili_monitor] 生成卡片失败：{e!r}")
+            return None
 
     def _in_quiet(self) -> bool:
         return in_quiet_hours(str(self._cfg("quiet_hours", "") or ""))
@@ -714,15 +777,17 @@ class BiliMonitor(Star):
     async def _push(
         self,
         sub: dict,
-        text: str,
+        text: str = "",
         images: list[str] | None = None,
         at_all: bool = False,
-    ) -> None:
+        png: bytes | None = None,
+    ) -> bool:
+        """发一条消息。返回是否至少有一个会话发送成功。"""
         images = [u for u in (images or []) if u][:4]
         sessions = [s for s in (sub.get("sessions") or []) if s]
         if not sessions:
             logger.info(f"[bili_monitor] {sub['uid']} 有更新，但没有配置推送会话")
-            return
+            return False
 
         sender = getattr(self.context, "send_message", None)
         if not callable(sender):
@@ -730,26 +795,37 @@ class BiliMonitor(Star):
                 "[bili_monitor] 当前 AstrBot 没有 Context.send_message，无法主动推送；"
                 "请确认 AstrBot 版本 >= 4.0"
             )
-            return
+            return False
 
+        any_ok = False
         for umo in sessions:
             chain = MessageChain()
             if at_all and "GroupMessage" in umo:
                 chain.chain.append(At(qq="all"))
-            chain.chain.append(Plain(text))
+            if text:
+                chain.chain.append(Plain(text))
+            if png:
+                chain.chain.append(image_from_bytes(png, f"bili_card_{int(time.time())}.png"))
             for url in images:
                 chain.chain.append(image_component(url))
+
+            has_media = bool(png or images)
             try:
                 await sender(umo, chain)
+                any_ok = True
             except Exception as e:
-                logger.error(f"[bili_monitor] 推送 {umo} 失败：{e!r}，退回纯文本")
-                try:
-                    fallback = MessageChain()
-                    fallback.chain.append(Plain(text))
-                    await sender(umo, fallback)
-                except Exception as e2:
-                    logger.error(f"[bili_monitor] 纯文本兜底也失败：{e2!r}")
+                logger.error(f"[bili_monitor] 推送 {umo} 失败：{e!r}")
+                if has_media and text:
+                    # 图片发不出去时，至少把文字发出去
+                    try:
+                        fallback = MessageChain()
+                        fallback.chain.append(Plain(text))
+                        await sender(umo, fallback)
+                        any_ok = True
+                    except Exception as e2:
+                        logger.error(f"[bili_monitor] 纯文本兜底也失败：{e2!r}")
             await asyncio.sleep(0.4)
+        return any_ok
 
     def _warn_risk(self, uid: str, err: Exception) -> None:
         now = time.time()
@@ -1042,6 +1118,36 @@ class BiliMonitor(Star):
         mid = self._account.get("mid") or "?"
         logger.info(f"[bili_monitor] 扫码登录成功，已绑定账号 {who}（UID {mid}），Cookie 已保存")
 
+    async def api_test_image(self):
+        """仪表盘自检：渲染一张示例卡片，确认图片模式真的能用。"""
+        if not card_mod.available():
+            return error_response(
+                "本地渲染不可用：没装 Pillow，或系统里找不到中文字体。"
+                "插件会自动退回文字推送；装上 pillow 并重启后可恢复。"
+            )
+        item = {
+            "uid": "test",
+            "nick": "B站监控助手",
+            "face": self._account.get("face") or "",
+            "ts": int(time.time()),
+            "kind": "dynamic",
+            "text": "这是一条图片模式自检消息。看到这张图，说明本地渲染正常，推送不再依赖第三方截图服务。",
+            "title": "",
+            "images": [],
+            "cover": "",
+            "link": "https://t.bilibili.com/123456789",
+        }
+        png = await self._render_card(item)
+        if not png:
+            return error_response("渲染失败，详情看插件日志")
+        return json_response(
+            {
+                "ok": True,
+                "size": len(png),
+                "image": "data:image/png;base64," + base64.b64encode(png).decode("ascii"),
+            }
+        )
+
     async def api_login_qr(self):
         try:
             return json_response(await self._qr_start())
@@ -1116,6 +1222,7 @@ class BiliMonitor(Star):
             ("test-push", self.api_test_push, ["POST"], "B站监控：发送测试推送"),
             ("login/qr", self.api_login_qr, ["POST"], "B站监控：生成登录二维码"),
             ("login/poll", self.api_login_poll, ["POST"], "B站监控：查询扫码状态"),
+            ("test-image", self.api_test_image, ["POST"], "B站监控：图片模式自检"),
         ]
         for suffix, handler, methods, desc in routes:
             try:

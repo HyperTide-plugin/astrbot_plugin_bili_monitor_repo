@@ -1,1 +1,2 @@
 qrcode>=7.4
+pillow>=9.0
